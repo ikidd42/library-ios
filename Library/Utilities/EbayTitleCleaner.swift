@@ -32,7 +32,9 @@ nonisolated enum EbayTitleCleaner {
         // Strip condition / collectible markers
         let conditionWords = [#"\bSigned\b"#, #"\bRARE\b"#, #"\bOOP\b"#, #"\bVintage\b"#,
                               #"\bEx[\s\-]?Library\b"#, #"\bBook\s+Club\b"#,
-                              #"\bNear\s+Fine\b"#, #"\bVG\+?\b"#, #"\bOut\s+of\s+Print\b"#,
+                              // Lookahead instead of \b: "+" is a non-word char, so "VG+"
+                              // has no word boundary after it and \b would never match.
+                              #"\bNear\s+Fine\b"#, #"\bVG\+?(?!\w)"#, #"\bOut\s+of\s+Print\b"#,
                               #"\bIllustrated\b"#, #"\bLot\s+of\s+\d+\b"#]
         for pattern in conditionWords {
             s = s.replacingOccurrences(of: pattern, with: " ", options: [.regularExpression, .caseInsensitive])
