@@ -3,6 +3,7 @@ import SwiftData
 import Vision
 import VisionKit
 import Observation
+import os
 
 /// Model tracking a batch of scanned barcodes and their lookup status
 @Observable
@@ -40,18 +41,13 @@ final class BatchScanModel {
         return true
     }
 
-    /// Add a manual ISBN entry (always accepted, no dedup against scanned barcodes)
+    /// Add a manual ISBN entry
     func addManualISBN(_ isbn: String) {
-        let cleaned = isbn.replacingOccurrences(of: "[^0-9Xx]", with: "", options: .regularExpression)
+        let cleaned = ISBN.normalize(isbn)
         guard !cleaned.isEmpty else { return }
 
         // Convert ISBN-10 to ISBN-13
-        let code: String
-        if cleaned.count == 10 {
-            code = isbn10toISBN13(cleaned)
-        } else {
-            code = cleaned
-        }
+        let code = cleaned.count == 10 ? ISBN.isbn13(fromISBN10: cleaned) : cleaned
 
         guard !scannedCodes.contains(code) else { return }
         scannedCodes.insert(code)
@@ -61,8 +57,11 @@ final class BatchScanModel {
     /// Update an existing not-found item with a new ISBN (from OCR or manual entry)
     func updateBarcode(_ id: UUID, newISBN: String) {
         guard let index = items.firstIndex(where: { $0.id == id }) else { return }
-        let cleaned = newISBN.replacingOccurrences(of: "[^0-9Xx]", with: "", options: .regularExpression)
-        let code = cleaned.count == 10 ? isbn10toISBN13(cleaned) : cleaned
+        let cleaned = ISBN.normalize(newISBN)
+        let code = cleaned.count == 10 ? ISBN.isbn13(fromISBN10: cleaned) : cleaned
+        // Keep the dedup set in sync with the corrected barcode
+        scannedCodes.remove(items[index].barcode)
+        scannedCodes.insert(code)
         items[index].barcode = code
         items[index].state = .pending
     }
@@ -93,16 +92,6 @@ final class BatchScanModel {
         items[index].state = .notFound
     }
 
-    private func isbn10toISBN13(_ isbn10: String) -> String {
-        let digits = "978" + isbn10.prefix(9)
-        var sum = 0
-        for (i, char) in digits.enumerated() {
-            guard let d = char.wholeNumberValue else { return isbn10 }
-            sum += (i % 2 == 0) ? d : d * 3
-        }
-        let check = (10 - (sum % 10)) % 10
-        return digits + "\(check)"
-    }
 }
 
 // MARK: - Batch Scanner that stays open for multiple scans
@@ -153,36 +142,14 @@ struct BatchBarcodeScannerView: UIViewControllerRepresentable {
 
         private func handleBarcode(_ barcode: RecognizedItem.Barcode) {
             guard let payload = barcode.payloadStringValue else { return }
-            let cleaned = payload.replacingOccurrences(of: "[^0-9Xx]", with: "", options: .regularExpression)
+            let cleaned = ISBN.normalize(payload)
+            guard !processedBarcodes.contains(cleaned),
+                  let code = ISBN.lookupCode(fromScannedPayload: payload) else { return }
 
-            guard !processedBarcodes.contains(cleaned) else { return }
-
-            var code: String?
-            if cleaned.count == 13 && (cleaned.hasPrefix("978") || cleaned.hasPrefix("979")) {
-                code = cleaned
-            } else if cleaned.count == 10 {
-                code = isbn10toISBN13(cleaned)
-            } else if cleaned.count == 12 || cleaned.count == 13 || cleaned.count == 8 {
-                code = cleaned
+            processedBarcodes.insert(cleaned)
+            DispatchQueue.main.async {
+                self.parent.onBarcodeScanned(code)
             }
-
-            if let code = code {
-                processedBarcodes.insert(cleaned)
-                DispatchQueue.main.async {
-                    self.parent.onBarcodeScanned(code)
-                }
-            }
-        }
-
-        private func isbn10toISBN13(_ isbn10: String) -> String {
-            let digits = "978" + isbn10.prefix(9)
-            var sum = 0
-            for (i, char) in digits.enumerated() {
-                guard let d = char.wholeNumberValue else { return isbn10 }
-                sum += (i % 2 == 0) ? d : d * 3
-            }
-            let check = (10 - (sum % 10)) % 10
-            return digits + "\(check)"
         }
     }
 }
@@ -429,8 +396,6 @@ struct BatchScannerSheet: View {
         do {
             let lines = try await ocrService.recognizeText(in: image)
             if let isbn = ocrService.extractISBN(from: lines) {
-                print("[BatchScan] OCR found ISBN: \(isbn)")
-
                 if let targetId = snapTargetItemId {
                     // Update an existing not-found item
                     model.updateBarcode(targetId, newISBN: isbn)
@@ -443,12 +408,11 @@ struct BatchScannerSheet: View {
                     }
                 }
             } else {
-                print("[BatchScan] OCR did not find an ISBN in the image")
                 let generator = UINotificationFeedbackGenerator()
                 generator.notificationOccurred(.error)
             }
         } catch {
-            print("[BatchScan] OCR error: \(error)")
+            Logger.ocr.error("Batch scan OCR failed: \(error)")
         }
         snapTargetItemId = nil
     }
@@ -477,7 +441,6 @@ struct BatchReviewSheet: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @State private var selectedItems: Set<UUID> = []
-    @State private var addedCount = 0
 
     // Snap ISBN for not-found items during review
     @State private var showCamera = false
@@ -634,7 +597,6 @@ struct BatchReviewSheet: View {
         do {
             let lines = try await ocrService.recognizeText(in: image)
             if let isbn = ocrService.extractISBN(from: lines) {
-                print("[BatchReview] OCR found ISBN: \(isbn)")
                 if let targetId = snapTargetItemId {
                     model.updateBarcode(targetId, newISBN: isbn)
                     let code = model.items.first(where: { $0.id == targetId })?.barcode ?? isbn
@@ -652,7 +614,7 @@ struct BatchReviewSheet: View {
                 generator.notificationOccurred(.error)
             }
         } catch {
-            print("[BatchReview] OCR error: \(error)")
+            Logger.ocr.error("Batch review OCR failed: \(error)")
         }
         snapTargetItemId = nil
     }
@@ -669,7 +631,6 @@ struct BatchReviewSheet: View {
                     modelContext.insert(book)
                 }
             }
-            addedCount += 1
         }
 
         dismiss()

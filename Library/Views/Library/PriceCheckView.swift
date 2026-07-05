@@ -448,12 +448,11 @@ struct PriceCheckView: View {
         guard APIConfiguration.shared.ebayIsConfigured else { return }
 
         isFetchingPrice = true
-        let priceResult = await lookupService.fetchEbayPrice(for: Book(
+        let priceResult = await lookupService.fetchEbayPrice(
+            isbn: result.isbn13 ?? result.isbn,
             title: result.title,
-            authors: result.authors,
-            isbn: result.isbn,
-            isbn13: result.isbn13
-        ))
+            author: result.authors
+        )
         ebayResult = priceResult
         isFetchingPrice = false
 
@@ -502,9 +501,6 @@ struct PriceCheckView: View {
     }
 
     private func formatPrice(_ price: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: NSNumber(value: price)) ?? "$\(price)"
+        price.formattedAsPrice()
     }
 }

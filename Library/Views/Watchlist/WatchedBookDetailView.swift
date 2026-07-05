@@ -14,6 +14,7 @@ struct WatchedBookDetailView: View {
     @State private var priceError: String?
     @State private var showDeleteConfirmation = false
     @State private var showAddedToLibrary = false
+    @State private var addedBookTitle = ""
 
     var body: some View {
         ScrollView {
@@ -207,7 +208,7 @@ struct WatchedBookDetailView: View {
         .alert("Added to Library", isPresented: $showAddedToLibrary) {
             Button("OK") { dismiss() }
         } message: {
-            Text("\"\(book.title)\" has been added to your library and removed from your watchlist.")
+            Text("\"\(addedBookTitle)\" has been added to your library and removed from your watchlist.")
         }
         .task {
             // Auto-refresh if never fetched or stale (>24h)
@@ -260,16 +261,15 @@ struct WatchedBookDetailView: View {
             libraryBook.priceHistory.append(newEntry)
         }
 
+        // Capture the title before deleting — the alert must not read the deleted model.
+        addedBookTitle = book.title
         modelContext.insert(libraryBook)
         modelContext.delete(book)
         showAddedToLibrary = true
     }
 
     private func formatPrice(_ price: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: NSNumber(value: price)) ?? "$\(price)"
+        price.formattedAsPrice()
     }
 }
 
@@ -379,10 +379,7 @@ struct WatchedPriceHistoryChartView: View {
     }
 
     private func formatPrice(_ price: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: NSNumber(value: price)) ?? "$\(price)"
+        price.formattedAsPrice()
     }
 }
 

@@ -4,8 +4,10 @@ import SwiftUI
 
 /// Central configuration for API keys and endpoints.
 /// Keys are stored in UserDefaults for easy user configuration.
+/// `nonisolated` because all state lives in UserDefaults (thread-safe),
+/// and the network service actors read this configuration off the main actor.
 @Observable
-final class APIConfiguration {
+nonisolated final class APIConfiguration {
     static let shared = APIConfiguration()
 
     // MARK: - Google Books
@@ -45,8 +47,9 @@ final class APIConfiguration {
         set { UserDefaults.standard.set(newValue, forKey: "ebayUseSandbox") }
     }
 
+    /// Configured either with Client ID + Secret (OAuth flow) or a direct App Token.
     var ebayIsConfigured: Bool {
-        !ebayClientID.isEmpty && !ebayClientSecret.isEmpty
+        (!ebayClientID.isEmpty && !ebayClientSecret.isEmpty) || !ebayAppToken.isEmpty
     }
 
     // MARK: - Open Library

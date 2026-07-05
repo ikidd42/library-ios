@@ -125,16 +125,13 @@ struct ExportView: View {
     private func exportLibrary() {
         isExporting = true
 
-        // Run on background to avoid blocking UI for large libraries
-        DispatchQueue.global(qos: .userInitiated).async {
-            let url = ExportService.exportToFile(books: books, format: selectedFormat)
-            DispatchQueue.main.async {
-                isExporting = false
-                if let url = url {
-                    exportURL = url
-                    showShareSheet = true
-                }
-            }
+        // SwiftData models aren't thread-safe, so serialize on the main actor.
+        // Export is string building over a few hundred rows — fast enough here.
+        let url = ExportService.exportToFile(books: books, format: selectedFormat)
+        isExporting = false
+        if let url = url {
+            exportURL = url
+            showShareSheet = true
         }
     }
 }

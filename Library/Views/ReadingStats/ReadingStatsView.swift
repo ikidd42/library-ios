@@ -323,7 +323,6 @@ struct ReadingStatsView: View {
     }
 
     private var mostProductiveMonth: MonthLabel? {
-        let calendar = Calendar.current
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM yyyy"
 

@@ -1,4 +1,3 @@
-
 import SwiftUI
 import SwiftData
 
@@ -6,8 +5,6 @@ import SwiftData
 struct PriceSummaryView: View {
     @Query(sort: \Book.dateAdded, order: .reverse) private var books: [Book]
     @State private var lookupService = BookLookupService()
-    @State private var isRefreshing = false
-    @State private var refreshProgress: Int = 0
 
     private var booksWithPrices: [Book] {
         books.filter { $0.ebayLowestPrice != nil }
@@ -134,9 +131,6 @@ struct PriceSummaryView: View {
     }
 
     private func refreshAllPrices() async {
-        isRefreshing = true
-        refreshProgress = 0
-
         for book in books {
             if let result = await lookupService.fetchEbayPrice(for: book) {
                 book.ebayLowestPrice = result.lowestPrice
@@ -147,19 +141,13 @@ struct PriceSummaryView: View {
                 let entry = PriceHistoryEntry(price: result.lowestPrice, currency: result.currency)
                 book.priceHistory.append(entry)
             }
-            refreshProgress += 1
 
             // Small delay to avoid rate limiting
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
-
-        isRefreshing = false
     }
 
     private func formatPrice(_ price: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: NSNumber(value: price)) ?? "$\(price)"
+        price.formattedAsPrice()
     }
 }

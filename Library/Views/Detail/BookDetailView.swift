@@ -9,7 +9,6 @@ struct BookDetailView: View {
 
     @State private var lookupService = BookLookupService()
     @State private var isFetchingPrice = false
-    @State private var ebayResult: EbayPriceResult?
     @State private var priceError: String?
     @State private var showCoverCapture = false
     @State private var newCoverImage: UIImage?
@@ -383,7 +382,6 @@ struct BookDetailView: View {
             book.ebayLowestPrice = result.lowestPrice
             book.ebayPriceURL = result.listingURL
             book.ebayPriceLastUpdated = Date()
-            ebayResult = result
 
             // Record price history
             let entry = PriceHistoryEntry(price: result.lowestPrice, currency: result.currency)
@@ -398,10 +396,7 @@ struct BookDetailView: View {
     }
 
     private func formatPrice(_ price: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: NSNumber(value: price)) ?? "$\(price)"
+        price.formattedAsPrice()
     }
 }
 

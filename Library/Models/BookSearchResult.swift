@@ -1,7 +1,7 @@
 import Foundation
 
 /// Lightweight struct for search results before adding to library
-struct BookSearchResult: Identifiable, Hashable {
+nonisolated struct BookSearchResult: Identifiable, Hashable {
     let id = UUID()
     let title: String
     let authors: String
@@ -33,17 +33,17 @@ struct BookSearchResult: Identifiable, Hashable {
 
 // MARK: - Google Books API Response Models
 
-struct GoogleBooksResponse: Codable {
+nonisolated struct GoogleBooksResponse: Codable {
     let totalItems: Int?
     let items: [GoogleBookItem]?
 }
 
-struct GoogleBookItem: Codable {
+nonisolated struct GoogleBookItem: Codable {
     let id: String?
     let volumeInfo: GoogleVolumeInfo?
 }
 
-struct GoogleVolumeInfo: Codable {
+nonisolated struct GoogleVolumeInfo: Codable {
     let title: String?
     let authors: [String]?
     let publisher: String?
@@ -56,12 +56,12 @@ struct GoogleVolumeInfo: Codable {
     let language: String?
 }
 
-struct GoogleIndustryIdentifier: Codable {
+nonisolated struct GoogleIndustryIdentifier: Codable {
     let type: String?
     let identifier: String?
 }
 
-struct GoogleImageLinks: Codable {
+nonisolated struct GoogleImageLinks: Codable {
     let smallThumbnail: String?
     let thumbnail: String?
 
@@ -74,11 +74,11 @@ struct GoogleImageLinks: Codable {
 
 // MARK: - Open Library API Response Models
 
-struct OpenLibrarySearchResponse: Codable {
+nonisolated struct OpenLibrarySearchResponse: Codable {
     let docs: [OpenLibraryDoc]?
 }
 
-struct OpenLibraryDoc: Codable {
+nonisolated struct OpenLibraryDoc: Codable {
     let title: String?
     let authorName: [String]?
     let isbn: [String]?
@@ -104,11 +104,11 @@ struct OpenLibraryDoc: Codable {
 
 // MARK: - eBay API Response Models
 
-struct EbaySearchResponse: Codable {
+nonisolated struct EbaySearchResponse: Codable {
     let itemSummaries: [EbayItemSummary]?
 }
 
-struct EbayItemSummary: Codable {
+nonisolated struct EbayItemSummary: Codable {
     let title: String?
     let price: EbayPrice?
     let itemWebUrl: String?
@@ -116,7 +116,7 @@ struct EbayItemSummary: Codable {
     let image: EbayImage?
 }
 
-struct EbayPrice: Codable {
+nonisolated struct EbayPrice: Codable {
     let value: String?
     let currency: String?
 
@@ -126,6 +126,6 @@ struct EbayPrice: Codable {
     }
 }
 
-struct EbayImage: Codable {
+nonisolated struct EbayImage: Codable {
     let imageUrl: String?
 }

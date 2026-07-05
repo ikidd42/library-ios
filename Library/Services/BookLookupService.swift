@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import os
 
 /// Coordinates book lookups across Google Books and Open Library,
 /// with cover image downloading and caching.
@@ -24,7 +25,6 @@ final class BookLookupService {
             }
 
             // Strategy 2: Open Library isbn search
-            print("[BookLookup] Google Books isbn: search returned nothing, trying Open Library...")
             let olResults = (try? await self.openLibrary.searchByISBN(isbn)) ?? []
             if !olResults.isEmpty {
                 return olResults
@@ -32,13 +32,12 @@ final class BookLookupService {
 
             // Strategy 3: Plain number search on Google Books (handles UPC codes
             // and other non-ISBN barcodes — Google sometimes indexes these)
-            print("[BookLookup] ISBN search failed, trying plain number search...")
             let plainResults = (try? await self.googleBooks.search(query: isbn, maxResults: 5)) ?? []
             if !plainResults.isEmpty {
                 return plainResults
             }
 
-            print("[BookLookup] No results for barcode \(isbn)")
+            Logger.books.info("No results for barcode \(isbn)")
             return []
         }
     }
@@ -63,16 +62,11 @@ final class BookLookupService {
 
     /// Returns results directly without updating view state. Used for background enrichment.
     func searchFreeTextResults(_ text: String) async -> [BookSearchResult] {
-        print("[BookLookup] searchFreeTextResults: '\(text)'")
         let googleResults = (try? await googleBooks.search(query: text, maxResults: 10)) ?? []
         if !googleResults.isEmpty {
-            print("[BookLookup] Google Books returned \(googleResults.count) result(s)")
             return googleResults
         }
-        print("[BookLookup] Google Books empty, trying Open Library")
-        let olResults = (try? await openLibrary.search(title: text)) ?? []
-        print("[BookLookup] Open Library returned \(olResults.count) result(s)")
-        return olResults
+        return (try? await openLibrary.search(title: text)) ?? []
     }
 
     func searchFreeText(_ text: String) async {
@@ -105,41 +99,31 @@ final class BookLookupService {
 
     // MARK: - eBay Price Lookup
 
-    func fetchEbayPrice(for book: Book) async -> EbayPriceResult? {
+    /// Fetches the lowest eBay price, trying ISBN first, then title/author searches.
+    func fetchEbayPrice(isbn: String?, title: String, author: String) async -> EbayPriceResult? {
         do {
-            return try await ebayService.fetchLowestPrice(
-                isbn: book.isbn13 ?? book.isbn,
-                title: book.title,
-                author: book.authors
-            )
+            return try await ebayService.fetchLowestPrice(isbn: isbn, title: title, author: author)
         } catch {
-            print("eBay price fetch error: \(error.localizedDescription)")
+            Logger.ebay.error("Price fetch failed for '\(title)': \(error.localizedDescription)")
             return nil
         }
+    }
+
+    func fetchEbayPrice(for book: Book) async -> EbayPriceResult? {
+        await fetchEbayPrice(isbn: book.isbn13 ?? book.isbn, title: book.title, author: book.authors)
+    }
+
+    func fetchEbayPrice(for watchedBook: WatchedBook) async -> EbayPriceResult? {
+        await fetchEbayPrice(
+            isbn: watchedBook.isbn13 ?? watchedBook.isbn,
+            title: watchedBook.title,
+            author: watchedBook.authors
+        )
     }
 
     /// Fetches the eBay listing title for a given item ID, reusing the cached OAuth token.
     func fetchEbayItemTitle(itemID: String) async -> String? {
         await ebayService.fetchItemTitle(itemID: itemID)
-    }
-
-    func fetchEbayPrice(for watchedBook: WatchedBook) async -> EbayPriceResult? {
-        let isbn = watchedBook.isbn13 ?? watchedBook.isbn
-        let title = watchedBook.title
-        let author = watchedBook.authors
-        print("[BookLookup] fetchEbayPrice(watched) — isbn=\(isbn ?? "nil") title='\(title)' author='\(author)'")
-        do {
-            let result = try await ebayService.fetchLowestPrice(isbn: isbn, title: title, author: author)
-            if let result {
-                print("[BookLookup] ✅ eBay result: \(result.formattedPrice) — '\(result.title)'")
-            } else {
-                print("[BookLookup] ⚠️ eBay returned no results for title='\(title)'")
-            }
-            return result
-        } catch {
-            print("[BookLookup] ❌ eBay fetch error: \(error)")
-            return nil
-        }
     }
 
     // MARK: - Create Book from Search Result

@@ -55,7 +55,7 @@ struct WatchlistSearchSheet: View {
                 } else if lookupService.searchResults.isEmpty && !lookupService.isSearching {
                     ContentUnavailableView("Search for a Book", systemImage: "magnifyingglass", description: Text("Enter a title above to find books to add to your watchlist."))
                 } else {
-                    List(lookupService.searchResults, id: \.title) { result in
+                    List(lookupService.searchResults) { result in
                         Button {
                             onSelect(result)
                             dismiss()

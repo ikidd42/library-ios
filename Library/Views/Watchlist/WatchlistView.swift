@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import os
 
 /// Displays all watched books and their current eBay market prices.
 /// Books can be added by sharing an eBay listing or via the + button to search manually.
@@ -8,7 +9,6 @@ struct WatchlistView: View {
     @Query(sort: \WatchedBook.dateAdded, order: .reverse) private var watchedBooks: [WatchedBook]
 
     @State private var lookupService = BookLookupService()
-    @State private var isRefreshing = false
     @State private var showAddSheet = false
 
     var body: some View {
@@ -131,7 +131,6 @@ struct WatchlistView: View {
 
     /// Batch-refreshes lowest eBay prices for all watched books.
     private func refreshAllPrices() async {
-        isRefreshing = true
         for book in watchedBooks {
             if let result = await lookupService.fetchEbayPrice(for: book) {
                 book.ebayLowestPrice = result.lowestPrice
@@ -143,19 +142,15 @@ struct WatchlistView: View {
             // Respect eBay rate limits
             try? await Task.sleep(nanoseconds: 500_000_000)
         }
-        isRefreshing = false
     }
 
     /// Reads items queued by the Share Extension and creates WatchedBook records.
     @MainActor
     private func ingestPendingItems() async {
-        print("[Watchlist] ingestPendingItems() called")
         let pending = SharedContainer.readPendingItems()
-        guard !pending.isEmpty else {
-            print("[Watchlist] No pending items to ingest")
-            return
-        }
-        print("[Watchlist] Ingesting \(pending.count) item(s)...")
+        guard !pending.isEmpty else { return }
+
+        Logger.watchlist.info("Ingesting \(pending.count) shared item(s)")
         SharedContainer.clearPendingItems()
 
         for item in pending {
@@ -166,7 +161,6 @@ struct WatchlistView: View {
                 ebayListingURL: item.ebayListingURL
             )
             modelContext.insert(watched)
-            print("[Watchlist] ✅ Inserted placeholder: '\(item.listingTitle)'")
 
             // Enrich asynchronously: real eBay title → Google Books metadata → price lookup
             Task { @MainActor in
@@ -182,16 +176,13 @@ struct WatchlistView: View {
     private func enrichWatchedBook(_ watched: WatchedBook, from item: PendingWatchItem) async {
         // Step 1: Get the real listing title from eBay
         let listingTitle = await lookupService.fetchEbayItemTitle(itemID: item.ebayItemID) ?? item.listingTitle
-        let cleanedTitle = cleanEbayTitle(listingTitle)
-        print("[Watchlist] eBay listing title: '\(listingTitle)'")
-        print("[Watchlist] Cleaned for search: '\(cleanedTitle)'")
+        let cleanedTitle = EbayTitleCleaner.clean(listingTitle)
 
         // Step 2: Find the actual book in Google Books / Open Library
         let searchTitle = cleanedTitle.isEmpty ? listingTitle : cleanedTitle
         let bookResults = await lookupService.searchFreeTextResults(searchTitle)
 
         if let match = bookResults.first {
-            print("[Watchlist] ✅ Book match: '\(match.title)' by \(match.authors)")
             watched.title = match.title
             watched.authors = match.authors
             watched.isbn = match.isbn
@@ -201,14 +192,12 @@ struct WatchlistView: View {
                 watched.coverImageData = await lookupService.downloadCoverImage(from: coverURL)
             }
         } else {
-            print("[Watchlist] ⚠️ No book match found, keeping cleaned title")
+            Logger.watchlist.info("No book match found for '\(searchTitle)', keeping cleaned title")
             watched.title = searchTitle
         }
 
         // Step 3: Now price-lookup with proper title / author / ISBN
-        print("[Watchlist] Fetching price for '\(watched.title)' by '\(watched.authors)'")
         if let result = await lookupService.fetchEbayPrice(for: watched) {
-            print("[Watchlist] ✅ Price: \(result.formattedPrice)")
             watched.ebayLowestPrice = result.lowestPrice
             watched.ebaySearchURL = result.searchResultsURL
             watched.ebayPriceLastUpdated = Date()
@@ -216,49 +205,8 @@ struct WatchlistView: View {
                 WatchedPriceEntry(price: result.lowestPrice, currency: result.currency)
             )
         } else {
-            print("[Watchlist] ⚠️ Price fetch returned nil (isbn=\(watched.isbn13 ?? watched.isbn ?? "none"), authors='\(watched.authors)')")
+            Logger.watchlist.info("Price fetch returned no results for '\(watched.title)'")
         }
-    }
-
-    /// Strips common eBay listing noise to produce a cleaner title for display and search.
-    /// Input:  "Harry Potter Sorcerer's Stone HC DJ 1st Ed/1st Print SIGNED Rowling"
-    /// Output: "Harry Potter Sorcerer's Stone Rowling"
-    private func cleanEbayTitle(_ raw: String) -> String {
-        var s = raw
-
-        // Strip trailing "| eBay" / "- eBay"
-        s = s.replacingOccurrences(of: #"\s*[|\-]\s*eBay\b"#, with: "", options: .regularExpression)
-
-        // Strip year patterns like "(1997)" or "(2001, Hardcover)"
-        s = s.replacingOccurrences(of: #"\(\d{4}[^)]*\)"#, with: " ", options: .regularExpression)
-
-        // Strip edition / printing noise
-        s = s.replacingOccurrences(
-            of: #"\b(\d+(st|nd|rd|th)|First|Second|Third)\s+(Edition|Printing|Print|Ed\.?)\b"#,
-            with: " ", options: [.regularExpression, .caseInsensitive])
-
-        // Strip format indicators
-        let formatWords = [#"\bH[CD]\b"#, #"\bHB\b"#, #"\bDJ\b"#, #"\bPB\b"#,
-                           #"\bHardcover\b"#, #"\bPaperback\b"#, #"\bSoftcover\b"#,
-                           #"\bMass\s+Market\b"#]
-        for pattern in formatWords {
-            s = s.replacingOccurrences(of: pattern, with: " ", options: [.regularExpression, .caseInsensitive])
-        }
-
-        // Strip condition / collectible markers
-        let conditionWords = [#"\bSigned\b"#, #"\bRARE\b"#, #"\bOOP\b"#, #"\bVintage\b"#,
-                              #"\bEx[\s\-]?Library\b"#, #"\bBook\s+Club\b"#,
-                              #"\bNear\s+Fine\b"#, #"\bVG\+?\b"#, #"\bOut\s+of\s+Print\b"#,
-                              #"\bIllustrated\b"#, #"\bLot\s+of\s+\d+\b"#]
-        for pattern in conditionWords {
-            s = s.replacingOccurrences(of: pattern, with: " ", options: [.regularExpression, .caseInsensitive])
-        }
-
-        // Collapse whitespace
-        return s.components(separatedBy: .whitespaces)
-                .filter { !$0.isEmpty }
-                .joined(separator: " ")
-                .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     /// Adds a book from a manual search result to the watchlist.
@@ -271,6 +219,9 @@ struct WatchlistView: View {
             coverImageURL: result.coverImageURL
         )
 
+        // Insert first so the row appears immediately, then fill in the price.
+        modelContext.insert(watched)
+
         if let result = await lookupService.fetchEbayPrice(for: watched) {
             watched.ebayLowestPrice = result.lowestPrice
             watched.ebaySearchURL = result.searchResultsURL
@@ -279,14 +230,9 @@ struct WatchlistView: View {
                 WatchedPriceEntry(price: result.lowestPrice, currency: result.currency)
             )
         }
-
-        modelContext.insert(watched)
     }
 
     private func formatPrice(_ price: Double) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = "USD"
-        return formatter.string(from: NSNumber(value: price)) ?? "$\(price)"
+        price.formattedAsPrice()
     }
 }

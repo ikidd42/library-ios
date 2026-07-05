@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Service for searching and retrieving book data from Google Books API
 actor GoogleBooksService {
@@ -64,7 +65,7 @@ actor GoogleBooksService {
             throw BookServiceError.invalidURL
         }
 
-        print("[GoogleBooks] Requesting: \(url.absoluteString)")
+        Logger.books.debug("Google Books request: \(url.absoluteString)")
 
         let (data, response) = try await session.data(from: url)
 
@@ -72,11 +73,9 @@ actor GoogleBooksService {
             throw BookServiceError.networkError
         }
 
-        print("[GoogleBooks] Status: \(httpResponse.statusCode)")
-
         guard (200...299).contains(httpResponse.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? "no body"
-            print("[GoogleBooks] Error body: \(body)")
+            Logger.books.error("Google Books failed (\(httpResponse.statusCode)): \(body)")
             if httpResponse.statusCode == 429 {
                 throw BookServiceError.rateLimited
             }

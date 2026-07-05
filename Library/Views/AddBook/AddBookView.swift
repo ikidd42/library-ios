@@ -415,7 +415,6 @@ struct AddBookView: View {
 
         // If user-edited fields didn't work, try each pre-built query
         for query in result.searchQueries {
-            print("[OCR Search] Trying query: \(query)")
             await lookupService.searchFreeText(query)
             if !lookupService.searchResults.isEmpty {
                 showSearchResults = true

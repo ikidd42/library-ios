@@ -100,10 +100,6 @@ struct PriceBadgeView: View {
     }
 
     private func formattedPrice(_ value: Double, currency: String) -> String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currency
-        formatter.maximumFractionDigits = 2
-        return formatter.string(from: NSNumber(value: value)) ?? "$\(value)"
+        value.formattedAsPrice(currency: currency)
     }
 }

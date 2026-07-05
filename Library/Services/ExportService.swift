@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Generates CSV or JSON exports of the library
 struct ExportService {
@@ -47,7 +48,7 @@ struct ExportService {
             try content.write(to: fileURL, atomically: true, encoding: .utf8)
             return fileURL
         } catch {
-            print("[Export] Failed to write file: \(error)")
+            Logger.export.error("Failed to write export file: \(error)")
             return nil
         }
     }

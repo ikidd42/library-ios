@@ -1,6 +1,7 @@
 import Foundation
 import Vision
 import UIKit
+import os
 
 /// Extracts text from images using Apple's Vision framework,
 /// then parses it to identify book title and author for API lookup.
@@ -176,9 +177,7 @@ final class OCRService {
 
         let rawText = cleaned.map { $0.text }.joined(separator: "\n")
 
-        print("[OCR] Extracted title: \(title ?? "none")")
-        print("[OCR] Extracted author: \(author ?? "none")")
-        print("[OCR] Search queries to try: \(queries)")
+        Logger.ocr.debug("Extracted title: \(title ?? "none"), author: \(author ?? "none")")
 
         return TitlePageInfo(
             title: title,

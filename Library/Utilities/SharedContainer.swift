@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// A pending watchlist item saved by the Share Extension and consumed by the main app.
 struct PendingWatchItem: Codable, Identifiable {
@@ -34,6 +35,11 @@ struct SharedContainer {
 
     private static let pendingFileName = "pending_watch_items.json"
 
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "Library",
+        category: "shared-container"
+    )
+
     // MARK: - URLs
 
     static var sharedContainerURL: URL? {
@@ -47,36 +53,27 @@ struct SharedContainer {
     // MARK: - Read
 
     static func readPendingItems() -> [PendingWatchItem] {
-        print("[SharedContainer] App Group ID: \(appGroupID)")
-        print("[SharedContainer] Container URL: \(sharedContainerURL?.path ?? "NIL — App Group not configured")")
-
         guard let url = pendingFileURL else {
-            print("[SharedContainer] ❌ pendingFileURL is nil — App Group is not set up correctly")
+            logger.error("App Group '\(appGroupID)' is not configured — cannot read pending items")
             return []
         }
-        print("[SharedContainer] Pending file path: \(url.path)")
 
         guard FileManager.default.fileExists(atPath: url.path) else {
-            print("[SharedContainer] ℹ️ No pending file found — nothing was shared yet")
-            return []
+            return [] // Nothing has been shared yet
         }
 
         guard let data = try? Data(contentsOf: url) else {
-            print("[SharedContainer] ❌ Could not read pending file data")
+            logger.error("Could not read pending items file")
             return []
         }
 
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         guard let items = try? decoder.decode([PendingWatchItem].self, from: data) else {
-            print("[SharedContainer] ❌ Failed to decode pending items. Raw contents: \(String(data: data, encoding: .utf8) ?? "<unreadable>")")
+            logger.error("Failed to decode pending items file")
             return []
         }
 
-        print("[SharedContainer] ✅ Read \(items.count) pending item(s):")
-        for item in items {
-            print("  • itemID=\(item.ebayItemID) title='\(item.listingTitle)' url=\(item.ebayListingURL)")
-        }
         return items
     }
 
@@ -97,20 +94,16 @@ struct SharedContainer {
 
     private static func write(_ items: [PendingWatchItem]) {
         guard let url = pendingFileURL else {
-            print("[SharedContainer] ❌ write() failed — pendingFileURL is nil")
+            logger.error("App Group '\(appGroupID)' is not configured — cannot write pending items")
             return
         }
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        if let data = try? encoder.encode(items) {
-            do {
-                try data.write(to: url, options: .atomic)
-                print("[SharedContainer] ✅ Wrote \(items.count) pending item(s) to \(url.path)")
-            } catch {
-                print("[SharedContainer] ❌ Write failed: \(error)")
-            }
-        } else {
-            print("[SharedContainer] ❌ Failed to encode pending items")
+        do {
+            let data = try encoder.encode(items)
+            try data.write(to: url, options: .atomic)
+        } catch {
+            logger.error("Failed to write pending items: \(error)")
         }
     }
 

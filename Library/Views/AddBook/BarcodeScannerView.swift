@@ -10,7 +10,7 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
 
     func makeUIViewController(context: Context) -> DataScannerViewController {
         let scanner = DataScannerViewController(
-            recognizedDataTypes: [.barcode(symbologies: [.ean13, .ean8, .upce, .ean8, .code128, .code39])],
+            recognizedDataTypes: [.barcode(symbologies: [.ean13, .ean8, .upce, .code128, .code39])],
             qualityLevel: .balanced,
             recognizesMultipleItems: false,
             isHighFrameRateTrackingEnabled: false,
@@ -61,45 +61,10 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
         }
 
         private func handleBarcode(_ barcode: RecognizedItem.Barcode) {
-            guard let payload = barcode.payloadStringValue else { return }
-            let cleaned = payload.replacingOccurrences(of: "[^0-9Xx]", with: "", options: .regularExpression)
-
-            print("[Scanner] Raw barcode: \(payload) → cleaned: \(cleaned) (length: \(cleaned.count))")
-
-            var code: String?
-
-            if cleaned.count == 13 && (cleaned.hasPrefix("978") || cleaned.hasPrefix("979")) {
-                // Standard ISBN-13 / EAN-13 Bookland barcode — this IS the ISBN
-                code = cleaned
-            } else if cleaned.count == 10 {
-                // Likely ISBN-10 — convert to ISBN-13
-                code = isbn10toISBN13(cleaned)
-            } else if cleaned.count == 12 || cleaned.count == 13 || cleaned.count == 8 {
-                // UPC-A (12), non-Bookland EAN-13, or EAN-8
-                // These are retail product codes, NOT ISBNs, but pass them through
-                // and let the lookup service try to find the book anyway
-                code = cleaned
-            }
-
-            if let code = code {
-                print("[Scanner] Accepted barcode: \(code)")
-                parent.scannedISBN = code
-                parent.isPresented = false
-            } else {
-                print("[Scanner] Rejected barcode: \(cleaned)")
-            }
-        }
-
-        /// Convert ISBN-10 to ISBN-13 by prepending 978 and recalculating check digit
-        private func isbn10toISBN13(_ isbn10: String) -> String {
-            let digits = "978" + isbn10.prefix(9)
-            var sum = 0
-            for (i, char) in digits.enumerated() {
-                guard let d = char.wholeNumberValue else { return isbn10 }
-                sum += (i % 2 == 0) ? d : d * 3
-            }
-            let check = (10 - (sum % 10)) % 10
-            return digits + "\(check)"
+            guard let payload = barcode.payloadStringValue,
+                  let code = ISBN.lookupCode(fromScannedPayload: payload) else { return }
+            parent.scannedISBN = code
+            parent.isPresented = false
         }
     }
 }
@@ -108,8 +73,6 @@ struct BarcodeScannerView: UIViewControllerRepresentable {
 struct BarcodeScannerSheet: View {
     @Binding var scannedISBN: String?
     @Environment(\.dismiss) private var dismiss
-
-    @State private var isActive = false
 
     var body: some View {
         NavigationStack {
@@ -139,9 +102,6 @@ struct BarcodeScannerSheet: View {
             )
         )
         .ignoresSafeArea()
-        .onAppear {
-            isActive = true
-        }
         .overlay(alignment: .bottom) {
             Text("Point your camera at a book's ISBN barcode")
                 .font(.callout)

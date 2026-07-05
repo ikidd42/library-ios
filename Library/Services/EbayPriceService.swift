@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Service for fetching current lowest eBay prices for books
 actor EbayPriceService {
@@ -16,7 +17,7 @@ actor EbayPriceService {
     /// Test credentials by attempting to acquire an OAuth token
     func testCredentials() async -> (success: Bool, message: String) {
         guard config.ebayIsConfigured else {
-            return (false, "Client ID and Client Secret are required")
+            return (false, "Enter a Client ID + Secret, or a direct App Token")
         }
 
         // Clear cached token so we force a fresh auth attempt
@@ -28,12 +29,19 @@ actor EbayPriceService {
             if token.isEmpty {
                 return (false, "Received empty token")
             }
+            if !config.ebayAppToken.isEmpty && !hasClientCredentials {
+                return (true, "Using your App Token directly")
+            }
             return (true, "Authenticated successfully")
         } catch EbayError.authenticationFailed {
             return (false, "Authentication failed — double-check your Client ID and Secret")
         } catch {
             return (false, "Connection error: \(error.localizedDescription)")
         }
+    }
+
+    private var hasClientCredentials: Bool {
+        !config.ebayClientID.isEmpty && !config.ebayClientSecret.isEmpty
     }
 
     /// Fetch the lowest current price for a book on eBay.
@@ -95,45 +103,22 @@ actor EbayPriceService {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("EBAY_US", forHTTPHeaderField: "X-EBAY-C-MARKETPLACE-ID")
 
-            print("[eBay Item] Fetching details for item \(itemID)")
+            Logger.ebay.debug("Fetching details for item \(itemID)")
             let (data, response) = try await session.data(for: request)
 
             guard let http = response as? HTTPURLResponse,
                   (200...299).contains(http.statusCode) else {
-                print("[eBay Item] ❌ Status: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
-                print("[eBay Item] Body: \(String(data: data, encoding: .utf8) ?? "unreadable")")
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                Logger.ebay.error("Item lookup failed with status \(status)")
                 return nil
             }
 
             let detail = try JSONDecoder().decode(EbayItemDetailResponse.self, from: data)
-            print("[eBay Item] ✅ Title: '\(detail.title)'")
             return detail.title
 
         } catch {
-            print("[eBay Item] ❌ \(error)")
+            Logger.ebay.error("Item lookup error: \(error)")
             return nil
-        }
-    }
-
-    /// Batch fetch prices for multiple books
-    func fetchPrices(for books: [(isbn: String?, title: String, author: String)]) async -> [EbayPriceResult?] {
-        await withTaskGroup(of: (Int, EbayPriceResult?).self) { group in
-            for (index, book) in books.enumerated() {
-                group.addTask {
-                    let result = try? await self.fetchLowestPrice(
-                        isbn: book.isbn,
-                        title: book.title,
-                        author: book.author
-                    )
-                    return (index, result)
-                }
-            }
-
-            var results = Array<EbayPriceResult?>(repeating: nil, count: books.count)
-            for await (index, result) in group {
-                results[index] = result
-            }
-            return results
         }
     }
 
@@ -176,16 +161,14 @@ actor EbayPriceService {
             throw EbayError.authenticationFailed
         }
 
-        print("[eBay Auth] Status: \(httpResponse.statusCode)")
-
         guard (200...299).contains(httpResponse.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? "no body"
-            print("[eBay Auth] Error: \(body)")
+            Logger.ebay.error("Auth failed (\(httpResponse.statusCode)): \(body)")
             throw EbayError.authenticationFailed
         }
 
         let tokenResponse = try JSONDecoder().decode(EbayTokenResponse.self, from: data)
-        print("[eBay Auth] Token acquired, expires in \(tokenResponse.expiresIn)s")
+        Logger.ebay.debug("Token acquired, expires in \(tokenResponse.expiresIn)s")
 
         cachedToken = tokenResponse.accessToken
         tokenExpiry = Date().addingTimeInterval(TimeInterval(tokenResponse.expiresIn - 60))
@@ -218,7 +201,7 @@ actor EbayPriceService {
             throw EbayError.invalidURL
         }
 
-        print("[eBay Search] Requesting: \(url.absoluteString)")
+        Logger.ebay.debug("Searching: \(url.absoluteString)")
 
         var request = URLRequest(url: url)
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -231,21 +214,17 @@ actor EbayPriceService {
             throw EbayError.networkError
         }
 
-        print("[eBay Search] Status: \(httpResponse.statusCode)")
-
         if httpResponse.statusCode == 429 {
             throw EbayError.rateLimited
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
             let body = String(data: data, encoding: .utf8) ?? "no body"
-            print("[eBay Search] Error body: \(body)")
+            Logger.ebay.error("Search failed (\(httpResponse.statusCode)): \(body)")
             throw EbayError.networkError
         }
 
         let decoded = try JSONDecoder().decode(EbaySearchResponse.self, from: data)
-
-        print("[eBay Search] Found \(decoded.itemSummaries?.count ?? 0) results")
 
         guard let items = decoded.itemSummaries, !items.isEmpty else {
             return nil
@@ -280,7 +259,7 @@ actor EbayPriceService {
 
 // MARK: - Models
 
-struct EbayPriceResult {
+nonisolated struct EbayPriceResult {
     let lowestPrice: Double
     let currency: String
     let title: String
@@ -290,14 +269,11 @@ struct EbayPriceResult {
     let searchResultsURL: String?
 
     var formattedPrice: String {
-        let formatter = NumberFormatter()
-        formatter.numberStyle = .currency
-        formatter.currencyCode = currency
-        return formatter.string(from: NSNumber(value: lowestPrice)) ?? "$\(lowestPrice)"
+        lowestPrice.formattedAsPrice(currency: currency)
     }
 }
 
-struct EbayTokenResponse: Codable {
+nonisolated struct EbayTokenResponse: Codable {
     let accessToken: String
     let expiresIn: Int
     let tokenType: String
@@ -309,7 +285,7 @@ struct EbayTokenResponse: Codable {
     }
 }
 
-private struct EbayItemDetailResponse: Decodable {
+private nonisolated struct EbayItemDetailResponse: Decodable {
     let title: String
 }
 
