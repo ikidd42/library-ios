@@ -1,11 +1,6 @@
-//
-//  LibraryApp.swift
-//  Library
-//
-//  Created by Ian on 2/11/26.
-//
 
 import SwiftUI
+import SwiftData
 
 @main
 struct LibraryApp: App {
@@ -13,5 +8,6 @@ struct LibraryApp: App {
         WindowGroup {
             ContentView()
         }
+        .modelContainer(for: [Book.self, PriceHistoryEntry.self, WatchedBook.self, WatchedPriceEntry.self])
     }
 }
