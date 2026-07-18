@@ -25,14 +25,14 @@ enum Marbling {
         }
         var mid: (Double, Double, Double) {
             switch self {
-            case .crimson: return (0.74, 0.47, 0.22)
+            case .crimson: return (0.76, 0.52, 0.28)
             case .indigo: return (0.42, 0.50, 0.64)
             case .forest: return (0.47, 0.59, 0.45)
             }
         }
         var vein: (Double, Double, Double) {
             switch self {
-            case .crimson: return (0.40, 0.13, 0.10)
+            case .crimson: return (0.47, 0.19, 0.14)
             case .indigo: return (0.13, 0.19, 0.33)
             case .forest: return (0.11, 0.25, 0.18)
             }

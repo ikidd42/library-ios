@@ -97,10 +97,11 @@ struct CoverArtView: View {
     }
 
     /// Generated placeholder when no image is available: half-leather with
-    /// marbled boards for some books, full cloth for the rest.
+    /// marbled boards for some books, full cloth for the rest. Row-size
+    /// thumbnails always use cloth — marble reads as mud below ~64pt.
     @ViewBuilder
     private var placeholderCover: some View {
-        if let kind = marbledKind {
+        if let kind = marbledKind, width >= 64 {
             halfLeatherCover(kind: kind)
         } else {
             clothCover

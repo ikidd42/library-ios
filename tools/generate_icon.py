@@ -216,6 +216,14 @@ def draw_books(size, scale=1.0, silhouettes=None):
     return layer
 
 
+def save_quantized(img, path):
+    """Palette-quantize opaque icons: the marble field defeats PNG's filters
+    (~900KB raw), while a dithered 256-color palette is visually identical
+    at icon sizes and ~4x smaller."""
+    img.convert("RGB").quantize(colors=256, method=Image.Quantize.MEDIANCUT,
+                                dither=Image.Dither.FLOYDSTEINBERG).save(path, optimize=True)
+
+
 def icon_default(path):
     size = (1024, 1024)
     field = marble_field(1024, MARBLE_FOREST, seed=19)
@@ -223,7 +231,7 @@ def icon_default(path):
     gilt_frame(img, inset=64)
     books = draw_books(size, scale=1.0)
     img = Image.alpha_composite(img, books)
-    img.convert("RGB").save(path)
+    save_quantized(img, path)
 
 
 def icon_dark(path):
@@ -233,7 +241,7 @@ def icon_dark(path):
     gilt_frame(img, inset=64, gilt=GILT_DEEP, alpha_outer=230, alpha_inner=140)
     books = draw_books(size, scale=1.0)
     img = Image.alpha_composite(img, books)
-    img.convert("RGB").save(path)
+    save_quantized(img, path)
 
 
 def icon_tinted(path):

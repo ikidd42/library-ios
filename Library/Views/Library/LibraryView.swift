@@ -241,7 +241,7 @@ struct LibraryView: View {
             columns: [GridItem(.adaptive(minimum: 110, maximum: 140), spacing: 16)],
             spacing: 24
         ) {
-            ForEach(Array(filteredBooks.enumerated()), id: \.element.id) { index, book in
+            ForEach(filteredBooks) { book in
                 NavigationLink(
                     destination: BookDetailView(book: book)
                         .zoomTransitionDestination(id: book.id, in: zoomNamespace)
