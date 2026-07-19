@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shelfworth</title>
+  <meta name="description" content="Catalog your book collection and track what it's worth.">
+  <style>
+    :root {
+      --canvas: #f6f0e4; --card: #fffdf7; --ink: #2a2115;
+      --ink-secondary: #77694f; --green: #31553b; --brass: #9a701f;
+      --rule: #e0d4bc;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --canvas: #151009; --card: #211a10; --ink: #f0e7d5;
+        --ink-secondary: #ae9f83; --green: #93c29e; --brass: #ddb670;
+        --rule: #403524;
+      }
+    }
+    * { margin: 0; box-sizing: border-box; }
+    body {
+      background: var(--canvas); color: var(--ink);
+      font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
+      min-height: 100svh; display: grid; place-items: center; padding: 2rem;
+    }
+    main { text-align: center; max-width: 34rem; }
+    h1 { font-size: 1.6rem; letter-spacing: 0.45em; text-indent: 0.45em; font-weight: 600; }
+    .fleuron { color: var(--brass); margin: 1.4rem 0; font-size: 0.7rem; letter-spacing: 0.6em; text-indent: 0.6em; }
+    p { color: var(--ink-secondary); line-height: 1.6; font-size: 1.05rem; }
+    a { color: var(--green); }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>SHELFWORTH</h1>
+    <div class="fleuron" aria-hidden="true">— ◆ —</div>
+    <p>Catalog your book collection and track what it&rsquo;s worth.<br>
+       A proper page is on its way; meanwhile, the shelves are open on
+       <a href="https://github.com/ikidd42/shelfworth">GitHub</a>.</p>
+  </main>
+</body>
+</html>
