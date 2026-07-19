@@ -98,6 +98,12 @@ func nonpareilOps(rng: inout SplitMix) -> [Op] {
     [.comb(spacing: 34, phase: rng.range(0, 34), z: 240, lambda: 22, dir: 1)]
 }
 
+func bouquetOps(rng: inout SplitMix) -> [Op] {
+    var ops = nonpareilOps(rng: &rng)
+    ops.append(.comb(spacing: 102, phase: rng.range(0, 102), z: 210, lambda: 44, dir: -1))
+    return ops
+}
+
 func lattice(_ ix: Int, _ iy: Int, _ seed: UInt64) -> Double {
     var h = UInt64(bitPattern: Int64(ix)) &* 0x9E3779B97F4A7C15
     h &+= UInt64(bitPattern: Int64(iy)) &* 0xC2B2AE3D27D4EB4F
@@ -134,11 +140,16 @@ func mix(_ a: RGB, _ b: RGB, _ t: Double) -> RGB {
 /// Renders a marbled sheet. No paper grain here (unlike the app) — grain is
 /// invisible at icon sizes and roughly triples the PNG payload.
 func marbleSheet(palette: MarblePalette, pattern: String, seed: UInt64,
-                 w: Int, h: Int, unitsPerPixel: Double, veins: Bool) -> CGImage {
+                 w: Int, h: Int, unitsPerPixel: Double, veins: Bool,
+                 veinStrength: Double = 1.0, wash: Double = 0) -> CGImage {
     var rng = SplitMix(seed: seed)
     let sheetW = Double(w) * unitsPerPixel, sheetH = Double(h) * unitsPerPixel
-    let ops = pattern == "stone" ? stoneOps(rng: &rng, w: sheetW, h: sheetH)
-                                 : nonpareilOps(rng: &rng)
+    let ops: [Op]
+    switch pattern {
+    case "stone": ops = stoneOps(rng: &rng, w: sheetW, h: sheetH)
+    case "bouquet": ops = bouquetOps(rng: &rng)
+    default: ops = nonpareilOps(rng: &rng)
+    }
     let banded = pattern != "stone"
     var pixels = [UInt8](repeating: 255, count: w * h * 4)
     for py in 0..<h {
@@ -167,9 +178,11 @@ func marbleSheet(palette: MarblePalette, pattern: String, seed: UInt64,
                 let vx = Double(px) * 0.016, vy = Double(py) * 0.016
                 let ridge = 1 - abs(2 * fbm(vx, vy, 4, seed &+ 11) - 1)
                 if ridge > 0.965 {
-                    c = mix(c, palette.gilt, 0.55 + 0.35 * (ridge - 0.965) / 0.035)
+                    let t = (0.55 + 0.35 * (ridge - 0.965) / 0.035) * veinStrength
+                    c = mix(c, palette.gilt, t)
                 }
             }
+            if wash > 0 { c = mix(c, palette.paper, wash) }
             let i = (py * w + px) * 4
             pixels[i] = UInt8(clamping: Int(c.0 * 255))
             pixels[i + 1] = UInt8(clamping: Int(c.1 * 255))
@@ -244,9 +257,9 @@ struct Spine {
 }
 
 let iconSpines = [
-    Spine(x: 308, width: 112, height: 434, top: 0x844133, bottom: 0x51251C),   // oxblood
-    Spine(x: 444, width: 136, height: 500, top: 0x394D66, bottom: 0x212E40),   // navy
-    Spine(x: 604, width: 112, height: 452, top: 0xB28334, bottom: 0x74521D),   // ochre
+    Spine(x: 268, width: 137, height: 530, top: 0x844133, bottom: 0x51251C),   // oxblood
+    Spine(x: 429, width: 166, height: 610, top: 0x394D66, bottom: 0x212E40),   // navy
+    Spine(x: 619, width: 137, height: 551, top: 0xB28334, bottom: 0x74521D),   // ochre
 ]
 
 /// Cloth book spines with gilt bands and a soft shadow.
@@ -313,11 +326,12 @@ func save(_ image: CGImage, _ path: String) {
 func iconLight(_ path: String) {
     let ctx = makeContext(1024)
     let marble = marbleSheet(palette: forestMarble, pattern: "stone", seed: 19,
-                             w: 1024, h: 1024, unitsPerPixel: 1.0, veins: true)
+                             w: 1024, h: 1024, unitsPerPixel: 1.0, veins: true,
+                             veinStrength: 0.6, wash: 0.30)
     ctx.draw(marble, in: CGRect(x: 0, y: 0, width: 1024, height: 1024))
-    vignette(ctx, size: 1024, color: hex(0x1B2C20), strength: 0.45)
+    vignette(ctx, size: 1024, color: hex(0x1B2C20), strength: 0.5)
     giltFrame(ctx, size: 1024, gilt: forestMarble.gilt, outerAlpha: 0.9, innerAlpha: 0.55)
-    drawSpines(ctx, baseline: 262, spines: iconSpines,
+    drawSpines(ctx, baseline: 220, spines: iconSpines,
                gilt: forestMarble.gilt, giltAlpha: 0.95)
     posterize(ctx)
     save(ctx.makeImage()!, path)
@@ -326,11 +340,12 @@ func iconLight(_ path: String) {
 func iconDark(_ path: String) {
     let ctx = makeContext(1024)
     let marble = marbleSheet(palette: espressoMarble, pattern: "stone", seed: 42,
-                             w: 1024, h: 1024, unitsPerPixel: 1.0, veins: true)
+                             w: 1024, h: 1024, unitsPerPixel: 1.0, veins: true,
+                             veinStrength: 0.6, wash: 0.30)
     ctx.draw(marble, in: CGRect(x: 0, y: 0, width: 1024, height: 1024))
-    vignette(ctx, size: 1024, color: hex(0x0B0805), strength: 0.55)
+    vignette(ctx, size: 1024, color: hex(0x0B0805), strength: 0.6)
     giltFrame(ctx, size: 1024, gilt: espressoMarble.gilt, outerAlpha: 0.9, innerAlpha: 0.55)
-    drawSpines(ctx, baseline: 262, spines: iconSpines,
+    drawSpines(ctx, baseline: 220, spines: iconSpines,
                gilt: espressoMarble.gilt, giltAlpha: 0.9)
     posterize(ctx)
     save(ctx.makeImage()!, path)
@@ -341,7 +356,7 @@ func iconTinted(_ path: String) {
     let cream: RGB = (0.94, 0.91, 0.84)
     giltFrame(ctx, size: 1024, gilt: cream, outerAlpha: 1.0, innerAlpha: 0.6)
     for spine in iconSpines {
-        let rect = CGRect(x: spine.x, y: 262, width: spine.width, height: spine.height)
+        let rect = CGRect(x: spine.x, y: 220, width: spine.width, height: spine.height)
         ctx.addPath(roundedPath(rect, 18))
         ctx.setFillColor(rgbColor(cream))
         ctx.fillPath()
@@ -358,9 +373,10 @@ func iconTinted(_ path: String) {
 func launchMotif(_ path: String) {
     let ctx = makeContext(360, 540)
     let scale: CGFloat = 0.35
-    // Center the spine cluster horizontally: icon spines span x 308–716
-    let clusterWidth = (716.0 - 308.0) * scale
-    let shift = (360 - clusterWidth) / 2 - 308 * scale
+    let minX = iconSpines.map(\.x).min()!
+    let maxX = iconSpines.map { $0.x + $0.width }.max()!
+    let clusterWidth = (maxX - minX) * scale
+    let shift = (360 - clusterWidth) / 2 - minX * scale
     let shifted = iconSpines.map {
         Spine(x: $0.x + shift / scale, width: $0.width, height: $0.height,
               top: $0.top, bottom: $0.bottom)
@@ -382,6 +398,23 @@ func launchMotif(_ path: String) {
     save(ctx.makeImage()!, path)
 }
 
+func launchEndpaper(_ path: String, dark: Bool) {
+    let w = 645, h = 1398
+    let palette = dark
+        ? MarblePalette(paper: (0.082, 0.063, 0.035), inks: forestMarble.inks,
+                        gilt: forestMarble.gilt)
+        : forestMarble
+    // Bouquet flame sheet faded far toward the canvas so the wordmark and
+    // motif stay legible — same treatment as the app's detail-view endpaper.
+    let ctx = makeContext(w, h)
+    let marble = marbleSheet(palette: palette, pattern: "bouquet", seed: 11,
+                             w: w, h: h, unitsPerPixel: 1.3, veins: false,
+                             wash: dark ? 0.82 : 0.72)
+    ctx.draw(marble, in: CGRect(x: 0, y: 0, width: w, height: h))
+    posterize(ctx)
+    save(ctx.makeImage()!, path)
+}
+
 // MARK: - Main
 
 let scriptURL = URL(fileURLWithPath: CommandLine.arguments[0]).resolvingSymlinksInPath()
@@ -389,6 +422,11 @@ let repoRoot = scriptURL.deletingLastPathComponent().deletingLastPathComponent()
 let assets = repoRoot.appendingPathComponent("Library/Assets.xcassets")
 let iconset = assets.appendingPathComponent("AppIcon.appiconset")
 let motifset = assets.appendingPathComponent("LaunchMotif.imageset")
+
+let endpaperset = assets.appendingPathComponent("LaunchEndpaper.imageset")
+try? FileManager.default.createDirectory(at: endpaperset, withIntermediateDirectories: true)
+launchEndpaper(endpaperset.appendingPathComponent("launch-endpaper.png").path, dark: false)
+launchEndpaper(endpaperset.appendingPathComponent("launch-endpaper-dark.png").path, dark: true)
 
 iconLight(iconset.appendingPathComponent("AppIcon.png").path)
 iconDark(iconset.appendingPathComponent("AppIcon-dark.png").path)
