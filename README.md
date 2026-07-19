@@ -1,6 +1,6 @@
 # Library
 
-![CI](https://github.com/ikidd42/library-ios/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/ikidd42/library-ios/actions/workflows/ci.yml/badge.svg) ![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)
 
 An iOS app for cataloging a personal book collection and tracking what your books are worth on eBay.
 
@@ -84,3 +84,7 @@ xcodebuild -project Library.xcodeproj -scheme Library \
 - eBay item-ID extraction from shared listing URLs
 - API response decoding for all three services
 - OCR ISBN extraction and title-page parsing heuristics
+
+## License
+
+[MIT](LICENSE)
