@@ -3,41 +3,451 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Shelfworth</title>
-  <meta name="description" content="Catalog your book collection and track what it's worth.">
+  <title>Shelfworth — Your library, handsomely appraised</title>
+  <meta name="description" content="Shelfworth catalogs your book collection and tracks what it's worth: scan, shelve, and watch the market, bound in a 19th-century Athenaeum aesthetic.">
+  <meta property="og:title" content="Shelfworth — Your library, handsomely appraised">
+  <meta property="og:description" content="Catalog your book collection and track what it's worth.">
+  <meta property="og:image" content="assets/marble-hero-light.jpg">
+  <meta name="theme-color" content="#f6f0e4" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#151009" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="assets/app-icon.png">
   <style>
     :root {
       --canvas: #f6f0e4; --card: #fffdf7; --ink: #2a2115;
       --ink-secondary: #77694f; --green: #31553b; --brass: #9a701f;
       --rule: #e0d4bc;
+      --well: #efe7d6; --ink-tertiary: #a2926f; --gilt: #c9a24b;
+      --hero-sheet: url("assets/marble-hero-light.jpg");
+      --endpaper: url("assets/endpaper-light.jpg");
+      --scrim: rgba(246, 240, 228, 0.55);
+      --shadow: rgba(42, 33, 21, 0.16);
     }
     @media (prefers-color-scheme: dark) {
       :root {
         --canvas: #151009; --card: #211a10; --ink: #f0e7d5;
         --ink-secondary: #ae9f83; --green: #93c29e; --brass: #ddb670;
         --rule: #403524;
+        --well: #2a2216; --ink-tertiary: #7c7059; --gilt: #d8b06a;
+        --hero-sheet: url("assets/marble-hero-dark.jpg");
+        --endpaper: url("assets/endpaper-dark.jpg");
+        --scrim: rgba(21, 16, 9, 0.45);
+        --shadow: rgba(0, 0, 0, 0.45);
       }
     }
+
     * { margin: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
     body {
       background: var(--canvas); color: var(--ink);
-      font-family: "Iowan Old Style", Georgia, "Times New Roman", serif;
-      min-height: 100svh; display: grid; place-items: center; padding: 2rem;
+      font-family: "New York", ui-serif, "Iowan Old Style", Georgia, "Times New Roman", serif;
+      line-height: 1.6; overflow-x: hidden;
     }
-    main { text-align: center; max-width: 34rem; }
-    h1 { font-size: 1.6rem; letter-spacing: 0.45em; text-indent: 0.45em; font-weight: 600; }
-    .fleuron { color: var(--brass); margin: 1.4rem 0; font-size: 0.7rem; letter-spacing: 0.6em; text-indent: 0.6em; }
-    p { color: var(--ink-secondary); line-height: 1.6; font-size: 1.05rem; }
+    /* Marbled endpaper, fixed behind everything like pasted-down sheets */
+    body::before {
+      content: ""; position: fixed; inset: 0; z-index: -1;
+      background: var(--endpaper) center / cover;
+      opacity: 0.32; pointer-events: none;
+    }
+    ::selection { background: var(--brass); color: var(--card); }
     a { color: var(--green); }
+    a:focus-visible, button:focus-visible {
+      outline: 2px solid var(--green); outline-offset: 3px; border-radius: 4px;
+    }
+    img { display: block; }
+
+    .skip-link {
+      position: absolute; left: -9999px; top: 0;
+      background: var(--green); color: var(--card); padding: 0.6rem 1rem;
+      z-index: 10; border-radius: 0 0 8px 0;
+    }
+    .skip-link:focus { left: 0; }
+
+    /* ---------- Chrome ---------- */
+
+    header.site {
+      display: flex; align-items: center; gap: 0.9rem;
+      max-width: 72rem; margin: 0 auto; padding: 1.4rem 1.5rem;
+    }
+    header.site img { width: 44px; height: 44px; border-radius: 10px;
+      box-shadow: 0 2px 8px var(--shadow); }
+    .wordmark {
+      font-weight: 600; letter-spacing: 0.42em; font-size: 1.02rem;
+      text-decoration: none; color: var(--ink);
+    }
+    nav.chapters { margin-left: auto; display: flex; gap: 1.6rem; align-items: center; }
+    nav.chapters a {
+      color: var(--ink-secondary); text-decoration: none;
+      font-size: 0.82rem; letter-spacing: 0.14em; text-transform: uppercase;
+    }
+    nav.chapters a:hover { color: var(--green); }
+    nav.chapters a.github {
+      color: var(--card); background: var(--green);
+      padding: 0.5rem 1.1rem; border-radius: 999px;
+    }
+    @media (prefers-color-scheme: dark) {
+      nav.chapters a.github { color: #151009; }
+    }
+    @media (max-width: 640px) {
+      nav.chapters a:not(.github) { display: none; }
+    }
+
+    main { max-width: 72rem; margin: 0 auto; padding: 0 1.5rem; }
+
+    .eyebrow {
+      font-size: 0.78rem; font-weight: 600; letter-spacing: 0.24em;
+      text-transform: uppercase; color: var(--ink-secondary);
+    }
+    .fleuron {
+      color: var(--brass); text-align: center; font-size: 1rem;
+      letter-spacing: 0.6em; text-indent: 0.6em; margin: 3.2rem 0;
+      user-select: none;
+    }
+
+    /* ---------- Hero ---------- */
+
+    .hero {
+      position: relative; margin-top: 1rem;
+      border-radius: 22px; overflow: hidden;
+      border: 1px solid var(--rule);
+      box-shadow: 0 24px 60px -24px var(--shadow);
+    }
+    .hero::before {
+      content: ""; position: absolute; inset: 0;
+      background: var(--hero-sheet) center / cover;
+    }
+    .hero::after {  /* legibility scrim + vignette */
+      content: ""; position: absolute; inset: 0;
+      background:
+        radial-gradient(120% 90% at 30% 20%, transparent 40%, var(--scrim) 100%),
+        linear-gradient(var(--scrim), var(--scrim));
+    }
+    .hero-inner {
+      position: relative; z-index: 1;
+      display: grid; grid-template-columns: 1.15fr 0.85fr;
+      gap: 3rem; align-items: center;
+      padding: clamp(2.5rem, 6vw, 5rem);
+    }
+    @media (max-width: 860px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 2.5rem; }
+    }
+    .hero h1 {
+      font-size: clamp(2.4rem, 5.2vw, 3.9rem); line-height: 1.08;
+      font-weight: 700; letter-spacing: -0.01em; margin: 1rem 0 1.2rem;
+      text-wrap: balance;
+    }
+    .hero h1 em { font-style: italic; color: var(--brass); }
+    .hero p.lede {
+      font-size: 1.13rem; color: var(--ink-secondary);
+      max-width: 30rem; margin-bottom: 2rem;
+    }
+    .cta-row { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+    .cta {
+      display: inline-block; text-decoration: none; font-weight: 600;
+      padding: 0.85rem 1.6rem; border-radius: 999px; font-size: 0.98rem;
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+    .cta:hover { transform: translateY(-2px); }
+    .cta.primary {
+      background: var(--green); color: #fffdf7;
+      box-shadow: 0 10px 24px -10px var(--shadow);
+    }
+    @media (prefers-color-scheme: dark) {
+      .cta.primary { color: #151009; }
+    }
+    .cta.secondary {
+      color: var(--ink); border: 1px solid var(--rule);
+      background: color-mix(in srgb, var(--card) 72%, transparent);
+    }
+
+    /* Screenshots as gilt-framed volumes on a shelf */
+    .hero-figure { justify-self: center; position: relative; padding-bottom: 2.6rem; }
+    .hero-figure::after {  /* the shelf edge */
+      content: ""; position: absolute; left: -12%; right: -12%; bottom: 0.9rem;
+      height: 3px; border-radius: 2px;
+      background: linear-gradient(90deg, transparent, var(--gilt) 18%, var(--gilt) 82%, transparent);
+      opacity: 0.85;
+    }
+    .volume {
+      border-radius: 26px; overflow: hidden;
+      border: 2px solid var(--gilt);
+      outline: 1px solid color-mix(in srgb, var(--gilt) 55%, transparent);
+      outline-offset: 4px;
+      box-shadow: 0 30px 50px -18px var(--shadow), 0 4px 10px var(--shadow);
+      transform: rotate(2.5deg);
+      transition: transform 0.35s ease;
+      max-width: min(300px, 72vw);
+    }
+    .volume:hover { transform: rotate(0deg) translateY(-6px); }
+    .volume img { width: 100%; height: auto; }
+
+    /* ---------- Chapters ---------- */
+
+    .chapter {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: clamp(2rem, 6vw, 4.5rem); align-items: center;
+      margin: 4.5rem 0;
+    }
+    .chapter.flip > .chapter-text { order: 2; }
+    @media (max-width: 860px) {
+      .chapter { grid-template-columns: 1fr; }
+      .chapter.flip > .chapter-text { order: 0; }
+    }
+    .chapter-text h2 {
+      font-size: clamp(1.7rem, 3.4vw, 2.4rem); line-height: 1.15;
+      margin: 0.9rem 0 1rem; text-wrap: balance;
+    }
+    .chapter-text p { color: var(--ink-secondary); max-width: 32rem; }
+    .chapter-text p + p { margin-top: 0.8rem; }
+    .chapter-text .dropcap::first-letter {
+      float: left; font-size: 3.4em; line-height: 0.85;
+      padding: 0.08em 0.12em 0 0; color: var(--brass); font-weight: 600;
+    }
+    .chapter-figure { justify-self: center; }
+    .chapter-figure .volume { transform: rotate(-1.5deg); max-width: min(270px, 70vw); }
+    .chapter.flip .chapter-figure .volume { transform: rotate(1.5deg); }
+    .chapter-figure .volume:hover { transform: rotate(0deg) translateY(-6px); }
+    figcaption {
+      text-align: center; margin-top: 1.1rem; font-size: 0.85rem;
+      color: var(--ink-tertiary); font-style: italic;
+    }
+
+    /* Feature list as a gilt-edged library card — the app's own CardStyle */
+    .card {
+      position: relative; background: var(--card);
+      border: 1px solid var(--rule); border-bottom-color: var(--brass);
+      border-radius: 16px; padding: clamp(1.6rem, 4vw, 2.6rem);
+      box-shadow: 0 14px 34px -18px var(--shadow);
+    }
+    .card::before, .card::after {  /* gilt page block beneath the top sheet */
+      content: ""; position: absolute; left: 14px; right: 14px;
+      height: 100%; border-radius: 16px; z-index: -1;
+      border: 1px solid var(--brass);
+    }
+    .card::before { bottom: -4px; opacity: 0.38; }
+    .card::after { bottom: -8px; left: 24px; right: 24px; opacity: 0.2; }
+
+    .colophon-grid {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 1.8rem; margin-top: 1.6rem;
+    }
+    .colophon-grid h3 {
+      font-size: 0.82rem; letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--ink-tertiary); margin-bottom: 0.45rem; font-weight: 600;
+    }
+    .colophon-grid p { font-size: 0.98rem; color: var(--ink-secondary); }
+
+    /* ---------- Spine cluster (the launch motif) ---------- */
+
+    .spines {
+      display: flex; align-items: flex-end; justify-content: center;
+      gap: 7px; margin: 0 auto; user-select: none;
+    }
+    .spine {
+      width: 30px; border-radius: 5px 5px 0 0; position: relative;
+      box-shadow: inset -3px 0 4px rgba(0,0,0,0.25), 0 -2px 6px var(--shadow);
+    }
+    .spine::before, .spine::after {  /* gilt bands at head and tail */
+      content: ""; position: absolute; left: 0; right: 0; height: 2px;
+      background: var(--gilt); opacity: 0.9;
+    }
+    .spine::before { top: 12px; box-shadow: 0 5px 0 color-mix(in srgb, var(--gilt) 55%, transparent); }
+    .spine::after { bottom: 12px; box-shadow: 0 -5px 0 color-mix(in srgb, var(--gilt) 55%, transparent); }
+    .spine.oxblood { height: 74px; background: linear-gradient(#844133, #51251c); }
+    .spine.navy    { height: 86px; background: linear-gradient(#394d66, #212e40); }
+    .spine.marbled { height: 80px; background: var(--hero-sheet) center / 280px auto; }
+    .spine.ochre   { height: 66px; background: linear-gradient(#b28334, #74521d); }
+
+    /* ---------- Footer ---------- */
+
+    footer.site {
+      text-align: center; padding: 3rem 1.5rem 3.5rem;
+      color: var(--ink-secondary); font-size: 0.92rem;
+    }
+    footer.site .wordmark { font-size: 0.9rem; }
+    footer.site p { margin-top: 0.9rem; }
+    footer.site a { text-decoration: none; }
+    footer.site a:hover { text-decoration: underline; }
+
+    /* ---------- Entrance motion (pure CSS — content never depends on JS) ---------- */
+
+    .reveal { animation: rise 0.7s ease both; }
+    .reveal:nth-of-type(2) { animation-delay: 0.12s; }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(22px); }
+      to { opacity: 1; transform: none; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      .reveal { animation: none; }
+      .volume, .volume:hover, .chapter-figure .volume { transform: none; }
+    }
   </style>
 </head>
 <body>
-  <main>
-    <h1>SHELFWORTH</h1>
-    <div class="fleuron" aria-hidden="true">— ◆ —</div>
-    <p>Catalog your book collection and track what it&rsquo;s worth.<br>
-       A proper page is on its way; meanwhile, the shelves are open on
-       <a href="https://github.com/ikidd42/shelfworth">GitHub</a>.</p>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site">
+    <img src="assets/app-icon.png" alt="Shelfworth app icon — marbled boards with three gilt-banded spines" width="44" height="44">
+    <a class="wordmark" href="#">SHELFWORTH</a>
+    <nav class="chapters" aria-label="Chapters">
+      <a href="#catalog">Catalog</a>
+      <a href="#valuation">Valuation</a>
+      <a href="#watchlist">Watchlist</a>
+      <a class="github" href="https://github.com/ikidd42/shelfworth">GitHub</a>
+    </nav>
+  </header>
+
+  <main id="main">
+
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-inner">
+        <div>
+          <p class="eyebrow">A catalog for the discerning reader</p>
+          <h1 id="hero-title">Your library, <em>handsomely</em> appraised.</h1>
+          <p class="lede">
+            Shelfworth catalogs the books on your shelves and keeps a quiet eye on
+            what they&rsquo;re worth — bound in ivory paper, library green, and
+            marbled boards worthy of a 19th-century athenaeum.
+          </p>
+          <div class="cta-row">
+            <a class="cta primary" href="https://github.com/ikidd42/shelfworth">View on GitHub</a>
+            <a class="cta secondary" href="#catalog">Browse the chapters</a>
+          </div>
+        </div>
+        <figure class="hero-figure">
+          <div class="volume">
+            <picture>
+              <source srcset="assets/library-dark.png" media="(prefers-color-scheme: dark)">
+              <img src="assets/library.png" alt="The Shelfworth library — cloth and half-leather marbled covers on ivory shelves" width="368" height="800" fetchpriority="high">
+            </picture>
+          </div>
+        </figure>
+      </div>
+    </section>
+
+    <div class="fleuron" aria-hidden="true">&#10087;</div>
+
+    <section class="chapter" id="catalog" aria-labelledby="catalog-title">
+      <div class="chapter-text reveal">
+        <p class="eyebrow">Chapter I &middot; The Catalog</p>
+        <h2 id="catalog-title">Every volume in its place</h2>
+        <p class="dropcap">
+          Scan a barcode, photograph a title page, or search by name — Shelfworth
+          binds each book into your catalog with its full bibliographic record.
+          Books without jackets are dressed in cloth or half-leather marbled
+          bindings, so the shelf always reads like a collection, never a database.
+        </p>
+        <p>
+          Track reading status from <em>Want to Read</em> to <em>Read</em>, rate
+          with a touch, and keep marginalia on every book.
+        </p>
+      </div>
+      <figure class="chapter-figure reveal">
+        <div class="volume">
+          <picture>
+            <source srcset="assets/library-dark.png" media="(prefers-color-scheme: dark)">
+            <img src="assets/library.png" alt="Library grid with gilt-stamped placeholder covers and price badges" width="368" height="800" loading="lazy">
+          </picture>
+        </div>
+        <figcaption>The library shelf, by lamplight and by day.</figcaption>
+      </figure>
+    </section>
+
+    <section class="chapter flip" id="valuation" aria-labelledby="valuation-title">
+      <div class="chapter-text reveal">
+        <p class="eyebrow">Chapter II &middot; The Valuation</p>
+        <h2 id="valuation-title">What is the shelf worth tonight?</h2>
+        <p class="dropcap">
+          Behind the scenes, Shelfworth appraises your collection against live
+          eBay listings — the lowest price for each book, refreshed on a schedule
+          you control, with the full price history charted like an auction
+          ledger.
+        </p>
+        <p>
+          Gains and losses are marked from the collector&rsquo;s perspective, so a
+          falling price on your own shelf reads as the caution it is.
+        </p>
+      </div>
+      <figure class="chapter-figure reveal">
+        <div class="volume">
+          <picture>
+            <source srcset="assets/prices-dark.png" media="(prefers-color-scheme: dark)">
+            <img src="assets/prices.png" alt="Price tracking list with valuations, deltas, and history charts" width="368" height="800" loading="lazy">
+          </picture>
+        </div>
+        <figcaption>The valuation ledger.</figcaption>
+      </figure>
+    </section>
+
+    <section class="chapter" id="watchlist" aria-labelledby="watchlist-title">
+      <div class="chapter-text reveal">
+        <p class="eyebrow">Chapter III &middot; The Watchlist</p>
+        <h2 id="watchlist-title">Covet with confidence</h2>
+        <p class="dropcap">
+          For the books you don&rsquo;t yet own, the watchlist follows the market
+          so you don&rsquo;t have to — current lowest ask, target price, and a tap
+          through to the listing when the moment is right.
+        </p>
+        <p>
+          When a watched book drops to your price, Shelfworth tells you. The
+          hunt, without the refreshing.
+        </p>
+      </div>
+      <figure class="chapter-figure reveal">
+        <div class="volume">
+          <picture>
+            <source srcset="assets/watchlist-dark.png" media="(prefers-color-scheme: dark)">
+            <img src="assets/watchlist.png" alt="Watchlist of coveted books with target prices and market movement" width="368" height="800" loading="lazy">
+          </picture>
+        </div>
+        <figcaption>The watchlist, ever vigilant.</figcaption>
+      </figure>
+    </section>
+
+    <div class="fleuron" aria-hidden="true">&#10087;</div>
+
+    <section class="card reveal" aria-labelledby="colophon-title" style="margin-bottom: 4.5rem;">
+      <p class="eyebrow">Colophon</p>
+      <h2 id="colophon-title" style="font-size: clamp(1.5rem, 3vw, 2rem); margin: 0.7rem 0 0.4rem;">
+        Bound by hand, in Swift
+      </h2>
+      <div class="colophon-grid">
+        <div>
+          <h3>Construction</h3>
+          <p>SwiftUI and SwiftData, with barcode scanning, title-page capture, and CSV &amp; JSON export of the whole collection.</p>
+        </div>
+        <div>
+          <h3>Illumination</h3>
+          <p>The marbled papers are generated in-app by a classical drop-and-tine renderer — the same sheets you see on this page.</p>
+        </div>
+        <div>
+          <h3>Provenance</h3>
+          <p>Open source under the MIT license. Issues, pull requests, and marginalia welcome on GitHub.</p>
+        </div>
+      </div>
+    </section>
+
+    <div class="spines" aria-hidden="true">
+      <div class="spine oxblood"></div>
+      <div class="spine marbled"></div>
+      <div class="spine navy"></div>
+      <div class="spine ochre"></div>
+    </div>
+
   </main>
+
+  <footer class="site">
+    <a class="wordmark" href="#">SHELFWORTH</a>
+    <p>Catalog your collection. Track its worth.
+      <br>&copy; <span id="year">2026</span> &middot;
+      <a href="https://github.com/ikidd42/shelfworth">GitHub</a> &middot;
+      <a href="https://github.com/ikidd42/shelfworth/blob/main/LICENSE">MIT License</a>
+    </p>
+  </footer>
+
+  <script>
+    // Minimal JS: just the footer year.
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
 </body>
 </html>
